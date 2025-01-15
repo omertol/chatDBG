@@ -5,7 +5,7 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, BertConfig, BertLMHeadModel, Trainer, TrainingArguments, EarlyStoppingCallback
 from peft import get_peft_model, LoraConfig, TaskType
 from sklearn.model_selection import train_test_split
-from itertools import product
+import optuna
 
 # Constants
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -67,97 +67,171 @@ def tokenize_data(examples, tokenizer):
     encodings['labels'] = labels
     return encodings
 
-# Function for grid search
-# Modify grid search function to correctly unpack all hyperparameters
-def grid_search(train_dataset, val_dataset, tokenizer):
-    # Define hyperparameter grid
-    param_grid = {
-        'learning_rate': [1e-6, 1e-4],
-        'batch_size': [4, 8, 16, 32, 64],
-        'num_train_epochs': [2, 5, 10, 20, 50],
-        'lora_r': [4, 8, 16, 32, 64],
-        'lora_alpha': [8, 16, 32, 64],
-        'lora_dropout': [0.1, 0.2, 0.3, 0.5],
-        'gradient_clipping': [1.0, 5.0, 10.0],
-        'warmup_steps': [0, 500, 1000, 5000],
-        'weight_decay': [0, 0.01, 0.1, 0.2],
-    }
+# Define the objective function for Optuna
+def objective(trial, train_dataset, val_dataset, tokenizer):
+    # Suggest values for hyperparameters using Optuna
+    learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-4)
+    batch_size = trial.suggest_categorical('batch_size', [4, 8, 16, 32, 64, 128])
+    num_train_epochs = trial.suggest_categorical('num_train_epochs', [2, 5, 10, 20, 50])
+    r = trial.suggest_categorical('lora_r', [4, 8, 16, 32, 64])
+    alpha = trial.suggest_categorical('lora_alpha', [8, 16, 32, 64, 128])
+    dropout = trial.suggest_categorical('lora_dropout', [0.1, 0.2, 0.3, 0.5])
+    gradient_clipping = trial.suggest_categorical('gradient_clipping', [1.0, 5.0, 10.0])
+    warmup_steps = trial.suggest_categorical('warmup_steps', [0, 500, 1000, 5000])
+    weight_decay = trial.suggest_categorical('weight_decay', [0, 0.01, 0.1, 0.2])
 
-    best_model = None
-    best_val_loss = float('inf')
-    best_params = {}
+    # Configure LoRA
+    model_name = "dicta-il/dictabert"
+    config = BertConfig.from_pretrained(model_name)
+    config.is_decoder = True
+    model = BertLMHeadModel.from_pretrained(model_name, config=config).to(DEVICE)
+    lora_model = config_lora(model, r=r, alpha=alpha, dropout=dropout, task_type=TaskType.CAUSAL_LM)
 
-    # Generate all combinations of hyperparameters
-    for learning_rate, batch_size, num_train_epochs, r, alpha, dropout, gradient_clipping, warmup_steps, weight_decay in product(*param_grid.values()):
-        logger.info(f"Starting training with r={r}, alpha={alpha}, dropout={dropout}, batch_size={batch_size}, learning_rate={learning_rate}, num_train_epochs={num_train_epochs}, gradient_clipping={gradient_clipping}, warmup_steps={warmup_steps}, weight_decay={weight_decay}")
+    # Set up the training arguments with early stopping
+    training_args = TrainingArguments(
+        output_dir=f"./results_{r}_{alpha}_{dropout}_{batch_size}_{learning_rate}",
+        num_train_epochs=int(num_train_epochs),  # Ensure it's an integer
+        per_device_train_batch_size=int(batch_size),  # Ensure it's an integer
+        logging_dir="./logs",
+        evaluation_strategy="steps",
+        save_steps=500,
+        save_total_limit=1,  # Save only the last checkpoint
+        remove_unused_columns=False,
+        load_best_model_at_end=True,  # Enable saving the best model
+        metric_for_best_model="eval_loss",  # Track validation loss to find the best model
+        greater_is_better=False,  # Lower validation loss is better
+        learning_rate=learning_rate,
+        gradient_accumulation_steps=1,  # Adjust if necessary
+        max_grad_norm=float(gradient_clipping),  # Ensure it's a float
+        weight_decay=float(weight_decay),  # Ensure it's a float
+        warmup_steps=int(warmup_steps),  # Ensure it's an integer
+    )
 
-        # Configure LoRA
-        model_name = "dicta-il/dictabert"
-        config = BertConfig.from_pretrained(model_name)
-        config.is_decoder = True
-        model = BertLMHeadModel.from_pretrained(model_name, config=config).to(DEVICE)
-        lora_model = config_lora(model, r=r, alpha=alpha, dropout=dropout, task_type=TaskType.CAUSAL_LM)
+    # Early stopping callback
+    early_stopping_callback = EarlyStoppingCallback(early_stopping_patience=2)  # Stop if no improvement after 2 eval steps
 
-        # Set up the training arguments with early stopping
-        training_args = TrainingArguments(
-            output_dir=f"./results_{r}_{alpha}_{dropout}_{batch_size}_{learning_rate}",
-            num_train_epochs=int(num_train_epochs),  # Ensure it's an integer
-            per_device_train_batch_size=int(batch_size),  # Ensure it's an integer
-            logging_dir="./logs",
-            evaluation_strategy="steps",
-            save_steps=500,
-            save_total_limit=1,  # Save only the last checkpoint
-            remove_unused_columns=False,
-            load_best_model_at_end=True,  # Enable saving the best model
-            metric_for_best_model="eval_loss",  # Track validation loss to find the best model
-            greater_is_better=False,  # Lower validation loss is better
-            learning_rate=learning_rate,
-            gradient_accumulation_steps=1,  # Adjust if necessary
-            max_grad_norm=float(gradient_clipping),  # Ensure it's a float
-            weight_decay=float(weight_decay),  # Ensure it's a float
-            warmup_steps=int(warmup_steps),  # Ensure it's an integer
-        )
+    # Initialize the Trainer
+    trainer = Trainer(
+        model=lora_model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
+        callbacks=[early_stopping_callback],
+    )
 
-        # Early stopping callback
-        early_stopping_callback = EarlyStoppingCallback(early_stopping_patience=2)  # Stop if no improvement after 2 eval steps
+    # Start fine-tuning
+    trainer.train()
 
-        # Initialize the Trainer with early stopping
-        trainer = Trainer(
-            model=lora_model,
-            args=training_args,
-            train_dataset=train_dataset,
-            eval_dataset=val_dataset,
-            callbacks=[early_stopping_callback],
-        )
+    # Get validation loss from the best model
+    eval_results = trainer.evaluate()
+    val_loss = eval_results["eval_loss"]
 
-        # Start fine-tuning
-        trainer.train()
+    # Return the validation loss for optimization
+    return val_loss
 
-        # Get validation loss from the best model
-        eval_results = trainer.evaluate()
-        val_loss = eval_results["eval_loss"]
+# Function to optimize hyperparameters using Optuna
+def optimize_hyperparameters(train_dataset, val_dataset, tokenizer, n_trials=100):
+    # Create an Optuna study to optimize the objective
+    study = optuna.create_study(direction='minimize')  # Minimize validation loss
+    study.optimize(lambda trial: objective(trial, train_dataset, val_dataset, tokenizer), n_trials=n_trials)
 
-        # Save the model if it's the best one based on validation loss
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_model = lora_model
-            best_params = {
-                "r": r,
-                "alpha": alpha,
-                "dropout": dropout,
-                "batch_size": batch_size,
-                "learning_rate": learning_rate,
-                "num_train_epochs": num_train_epochs,
-                "gradient_clipping": gradient_clipping,
-                "warmup_steps": warmup_steps,
-                "weight_decay": weight_decay,
-            }
-            # Save the best model
-            best_model.save_pretrained(f"./best_model_{r}_{alpha}_{dropout}_{batch_size}_{learning_rate}")
-            logger.info(f"Best model updated with val_loss={val_loss}")
+    # Get the best hyperparameters
+    best_params = study.best_params
+    logger.info(f"Best hyperparameters: {best_params}")
+    logger.info(f"Best validation loss: {study.best_value}")
 
+    # Return the best model after optimizing the hyperparameters
+    best_model = objective(optuna.create_study(direction='minimize').best_trial, train_dataset, val_dataset, tokenizer)
     return best_model, best_params
 
+# def grid_search(train_dataset, val_dataset, tokenizer):
+#     # Define hyperparameter grid
+#     param_grid = {
+#         'learning_rate': [1e-6, 1e-5, 3e-5, 5e-5, 1e-4, 3e-4],
+#         'batch_size': [4, 8, 16, 32, 64, 128],
+#         'num_train_epochs': [2, 5, 10, 20, 50],
+#         'lora_r': [4, 8, 16, 32, 64],
+#         'lora_alpha': [8, 16, 32, 64, 128],
+#         'lora_dropout': [0.1, 0.2, 0.3, 0.5],
+#         'gradient_clipping': [1.0, 5.0, 10.0],
+#         'warmup_steps': [0, 500, 1000, 5000],
+#         'weight_decay': [0, 0.01, 0.1, 0.2],
+#     }
+#
+#     best_model = None
+#     best_val_loss = float('inf')
+#     best_params = {}
+#
+#     # Generate all combinations of hyperparameters
+#     for learning_rate, batch_size, num_train_epochs, r, alpha, dropout, gradient_clipping, warmup_steps, weight_decay in product(*param_grid.values()):
+#         logger.info(f"Starting training with r={r}, alpha={alpha}, dropout={dropout}, batch_size={batch_size}, learning_rate={learning_rate}, num_train_epochs={num_train_epochs}, gradient_clipping={gradient_clipping}, warmup_steps={warmup_steps}, weight_decay={weight_decay}")
+#
+#         # Configure LoRA
+#         model_name = "dicta-il/dictabert"
+#         config = BertConfig.from_pretrained(model_name)
+#         config.is_decoder = True
+#         model = BertLMHeadModel.from_pretrained(model_name, config=config).to(DEVICE)
+#         lora_model = config_lora(model, r=r, alpha=alpha, dropout=dropout, task_type=TaskType.CAUSAL_LM)
+#
+#         # Set up the training arguments with early stopping
+#         training_args = TrainingArguments(
+#             output_dir=f"./results_{r}_{alpha}_{dropout}_{batch_size}_{learning_rate}",
+#             num_train_epochs=int(num_train_epochs),  # Ensure it's an integer
+#             per_device_train_batch_size=int(batch_size),  # Ensure it's an integer
+#             logging_dir="./logs",
+#             evaluation_strategy="steps",
+#             save_steps=500,
+#             save_total_limit=1,  # Save only the last checkpoint
+#             remove_unused_columns=False,
+#             load_best_model_at_end=True,  # Enable saving the best model
+#             metric_for_best_model="eval_loss",  # Track validation loss to find the best model
+#             greater_is_better=False,  # Lower validation loss is better
+#             learning_rate=learning_rate,
+#             gradient_accumulation_steps=1,  # Adjust if necessary
+#             max_grad_norm=float(gradient_clipping),  # Ensure it's a float
+#             weight_decay=float(weight_decay),  # Ensure it's a float
+#             warmup_steps=int(warmup_steps),  # Ensure it's an integer
+#         )
+#
+#         # Early stopping callback
+#         early_stopping_callback = EarlyStoppingCallback(early_stopping_patience=2)  # Stop if no improvement after 2 eval steps
+#
+#         # Initialize the Trainer with early stopping
+#         trainer = Trainer(
+#             model=lora_model,
+#             args=training_args,
+#             train_dataset=train_dataset,
+#             eval_dataset=val_dataset,
+#             callbacks=[early_stopping_callback],
+#         )
+#
+#         # Start fine-tuning
+#         trainer.train()
+#
+#         # Get validation loss from the best model
+#         eval_results = trainer.evaluate()
+#         val_loss = eval_results["eval_loss"]
+#
+#         # Save the model if it's the best one based on validation loss
+#         if val_loss < best_val_loss:
+#             best_val_loss = val_loss
+#             best_model = lora_model
+#             best_params = {
+#                 "r": r,
+#                 "alpha": alpha,
+#                 "dropout": dropout,
+#                 "batch_size": batch_size,
+#                 "learning_rate": learning_rate,
+#                 "num_train_epochs": num_train_epochs,
+#                 "gradient_clipping": gradient_clipping,
+#                 "warmup_steps": warmup_steps,
+#                 "weight_decay": weight_decay,
+#             }
+#             # Save the best model
+#             best_model.save_pretrained(f"./best_model_{r}_{alpha}_{dropout}_{batch_size}_{learning_rate}")
+#             logger.info(f"Best model updated with val_loss={val_loss}")
+#
+#     return best_model, best_params
 
 # Main script logic
 def main():
@@ -196,10 +270,10 @@ def main():
     train_dataset = ArcDataset(train_encodings)
     val_dataset = ArcDataset(val_encodings)
 
-    # Perform grid search to find the best model and hyperparameters
-    best_model, best_params = grid_search(train_dataset, val_dataset, tokenizer)
+    # Perform optimization to find the best model and hyperparameters
+    best_model, best_params = optimize_hyperparameters(train_dataset, val_dataset, tokenizer)
 
-    # After grid search, save the best model's weights
+    # After optimization, save the best model's weights
     torch.save(best_model.state_dict(), os.path.join(DATA_PATH, "best_model_final.pth"))
     logger.info(f"Best model parameters: {best_params}")
 
