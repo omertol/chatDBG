@@ -72,11 +72,11 @@ def tokenize_data(examples, tokenizer):
 def grid_search(train_dataset, val_dataset, tokenizer):
     # Define hyperparameter grid
     param_grid = {
-        'learning_rate': [1e-6, 1e-5, 3e-5, 5e-5, 1e-4, 3e-4],
-        'batch_size': [4, 8, 16, 32, 64, 128],
+        'learning_rate': [1e-6, 1e-4],
+        'batch_size': [4, 8, 16, 32, 64],
         'num_train_epochs': [2, 5, 10, 20, 50],
         'lora_r': [4, 8, 16, 32, 64],
-        'lora_alpha': [8, 16, 32, 64, 128],
+        'lora_alpha': [8, 16, 32, 64],
         'lora_dropout': [0.1, 0.2, 0.3, 0.5],
         'gradient_clipping': [1.0, 5.0, 10.0],
         'warmup_steps': [0, 500, 1000, 5000],
