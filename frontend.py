@@ -1,9 +1,10 @@
 import streamlit as st
 from streamlit_chat import message
-from chatbot_rag import *
+from backend import *
 import base64
 from PIL import Image
 import io
+
 
 # Page config
 st.set_page_config(
