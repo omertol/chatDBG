@@ -3,6 +3,7 @@ import torch
 from transformers import AutoTokenizer, AutoModel
 import spacy
 import fasttext
+from DictaBERTEmbeddings import DictaBERTEmbeddings
 
 # Constants
 DATA_PATH = './data/'
@@ -25,7 +26,7 @@ def initialize_preprocessing():
     model_hebrew = AutoModel.from_pretrained('dicta-il/dictabert-lex', trust_remote_code=True)
     model_hebrew = model_hebrew.to(DEVICE)
     model_hebrew.eval()
-    
+    print("done")
     # Load spaCy model for English
     nlp_english = spacy.load('en_core_web_sm')
     
@@ -66,7 +67,8 @@ def preprocess_query(query):
         query_processed = " ".join([token.lemma_.lower() for token in doc if not token.is_stop and not token.is_punct])
 
     else:
-        query_processed = query 
+        query_processed = query
+
 
     return query_processed
 
