@@ -1,14 +1,15 @@
 import os
 import torch
 import pandas as pd
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from DictaBERTEmbeddings import DictaBERTEmbeddings
+from query_prep import *
 
 # Constants
-DATA_PATH = '/sise/home/omertole/chatdbg/data/'
+DATA_PATH = './data/'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 api_key = "YOUR-API-KEY"
 
@@ -19,12 +20,14 @@ qa_chain = None
 
 # Helper functions
 def initialize_retriever(index_name, embedding_model):
-    vectorstore = Chroma(
-        persist_directory=index_name, 
-        embedding_function=embedding_model
+    vectorstore = FAISS.load_local(
+        folder_path=index_name,
+        embeddings=embedding_model,
+        allow_dangerous_deserialization=True
     )
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
     return retriever
+
 
 def initialize_llm():
     llm = ChatOpenAI(
@@ -50,14 +53,15 @@ def initialize_llm():
     return qa_chain
 
 def answer_query(user_query, to_print=True):
-    context = retriever.get_relevant_documents(user_query)
+    proccessed_query = preprocess_query(user_query)
+    context = retriever.get_relevant_documents(proccessed_query)
     retrieved_ids = [doc.metadata['id'] for doc in context]
-    documents = data[data['book_id'].isin(retrieved_ids)][['book_id', 'combined']]
-    context_text = "\n".join([f"quote: {row['combined']}" for _, row in documents.iterrows()])
+    documents = data[data['book_id'].isin(retrieved_ids)][['book_id', 'document']]
+    context_text = "\n".join([f"quote: {row['document']}" for _, row in documents.iterrows()])
     response = qa_chain({"query": user_query, "context": context_text})
     if to_print:
         print(f"User's Question: {user_query}\nChatbot Response: {response['text']}")
-    return response, documents
+    return response, documents['book_id']
 
 def load_pkl(path):
     pickle_file = os.path.join(DATA_PATH, path)
@@ -66,10 +70,12 @@ def load_pkl(path):
 
 def initialize_components():
     global data, retriever, qa_chain
+    initialize_preprocessing()
     data = load_pkl('prepd_data.pkl')
     embedding_model = load_pkl('embedding_dictaBERT.pkl')
-    retriever = initialize_retriever("chroma_db_dicta_emb", embedding_model)
+    retriever = initialize_retriever("faiss_dicta_index", embedding_model)
     qa_chain = initialize_llm()
+    print("Done initialize")
 
 if __name__ == "__main__":
     initialize_components()
