@@ -11,6 +11,21 @@ You will need it for various functionalities, including fine-tuning models, text
 
 ---
 
+## 📁 Data Structure
+
+The preprocessed data follows the tabular structure below:
+
+| Column Name        | Description                                                     |
+|--------------------|-----------------------------------------------------------------|
+| `book_id`          | Unique identifier (serves as the index)                         |
+| `type`             | Type of document (e.g., speech, diary, letter)                  |
+| `unit`             | Source or collection from which the document was taken          |
+| `headline`         | Title or short description of the document                      |
+| `additional_info1` | First part of the main text content                             |
+| `additional_info2` | Second part of the main text content                            |
+
+---
+
 ## 🧑‍💻 Environment Setup
 
 To set up the environment, you will need to install the dependencies listed in the `requirements.txt` file. Follow these steps to get started:
@@ -53,12 +68,12 @@ Follow the steps below to prepare and deploy the pipeline:
 
 ### 1. Preprocess the Data
 
-Start by running the `prep_data.ipynb` notebook.  
+Start by running the `data_prep.ipynb` notebook.  
 This notebook cleans and structures the raw data from various sources (e.g., speeches, diary entries) and prepares it for embedding.
 
 ```bash
 # Run the data preparation notebook
-prep_data.ipynb
+data_prep.ipynb
 ```
 
 ### 2. Generate Embeddings
@@ -67,7 +82,7 @@ After the data has been preprocessed, execute the `embedding.ipynb` notebook to 
 
 ```bash
 # Run the embedding creation notebook
-embedding.ipynb
+embeddings.ipynb
 ```
 
 ### 3. Create the Index
@@ -78,21 +93,6 @@ Run the `index_setup.ipynb` notebook to create the index from the generated embe
 # Run the index setup notebook
 index_setup.ipynb
 ```
-
----
-
-## 📁 Data Structure
-
-The preprocessed data follows the tabular structure below:
-
-| Column Name        | Description                                                     |
-|--------------------|-----------------------------------------------------------------|
-| `book_id`          | Unique identifier (serves as the index)                         |
-| `type`             | Type of document (e.g., speech, diary, letter)                  |
-| `unit`             | Source or collection from which the document was taken          |
-| `headline`         | Title or short description of the document                      |
-| `additional_info1` | First part of the main text content                             |
-| `additional_info2` | Second part of the main text content                            |
 
 ---
 
@@ -110,5 +110,3 @@ This optional pipeline enables further customization of the system for tasks lik
 ## 📝 Notes
 
 - Ensure all dependencies listed in the notebooks are installed.
-- For large datasets, consider batching or chunking to optimize memory use during embedding and indexing.
-
