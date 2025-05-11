@@ -41,7 +41,7 @@ Includes: `transformers`, `faiss-gpu`, `langchain`, `streamlit`, and more.
 ## 🔧 Pipeline Steps
 
 1. **Preprocess data**: `data_prep.ipynb`
-2. **Generate embeddings**: `embedding.ipynb`
+2. **Generate embeddings**: `embeddings.ipynb`
 3. **Create FAISS index**: `index_setup.ipynb`
 
 To enrich the database, run `JSON_wiki_extraction.ipynb` for extracting relevant Wikipedia content.
