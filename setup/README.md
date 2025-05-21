@@ -42,9 +42,12 @@ Includes: `transformers`, `faiss-gpu`, `langchain`, `streamlit`, and more.
 
 1. **Preprocess data**: `data_prep.ipynb`
 2. **Generate embeddings**: `embeddings.ipynb`
-3. **Create FAISS index**: `index_setup.ipynb`
+3. **Create FAISS index**: `RAG_setup.ipynb`
 
-To enrich the database, run `JSON_wiki_extraction.ipynb` for extracting relevant Wikipedia content.
+To enrich the database, run JSON_wiki_extraction.ipynb to extract relevant Wikipedia content. 
+
+You can create a list of page names within the notebook, then loop over the list using the function save_wikipedia_page_data('page_name').
+
 
 ---
 
