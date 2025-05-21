@@ -56,6 +56,8 @@ You can create a list of page names within the notebook, then loop over the list
 1. Generate parallel text: `text_generation.ipynb`
 2. Fine-tune model: `fine_tune.ipynb`
 
+The `fine_tune.ipynb` notebook includes an input validation step based on [OpenAI's Fine-Tuning Guide](https://platform.openai.com/docs/guides/fine-tuning).
+
 ---
 
 ## 📝 Notes
