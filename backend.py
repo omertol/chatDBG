@@ -35,12 +35,6 @@ def initialize_retriever(index_name, embedding_model):
         embeddings=embedding_model,
         allow_dangerous_deserialization=True
     )
-
-    # embeddings_retriever = MultiQueryRetriever.from_llm(
-    #     retriever=vectorstore.as_retriever(search_kwargs={"k": 10}),
-    #     llm=retrival_llm,
-    #     prompt=retrival_prompt
-    # )
     embeddings_retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
 
     bm25_retriever = BM25Retriever.from_documents(data)
