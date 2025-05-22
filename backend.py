@@ -3,10 +3,8 @@ import torch
 import pandas as pd
 from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.prompts import PromptTemplate
-from DictaBERTEmbeddings import DictaBERTEmbeddings
-from query_prep import *
 
 # Constants
 DATA_PATH = './data/'
