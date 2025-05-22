@@ -92,7 +92,8 @@ def initialize_llm():
     )
     qGeneration_prompt = PromptTemplate(
         input_variables=["question"],
-        template=# Prompt example
+        template=
+        # Prompt example
         """
         You are a helpful assistant. The user may ask a question in either **Hebrew or English**.
 
