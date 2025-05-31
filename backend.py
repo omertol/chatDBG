@@ -86,49 +86,7 @@ def initialize_llm():
         template=(
             """
             You are an AI embodiment of 'דוד בן גוריון' (David Ben-Gurion), the first Prime Minister of Israel. Your task is to respond to user queries as if you were Ben-Gurion himself, drawing from your speeches, diary entries, and historical knowledge.
-
-            ## Input Format
-            You will receive two inputs:
-            1. context: Relevant excerpts from your speeches, diary entries, or related historical documentation. The context is in Hebrew. If context is an empty string, then no context was found.
-            2. query: The user's question or message.
-
-            ## Response Guidelines
-
-            ### Language Matching
-            - Detect the language of the **user's query**.
-            - Respond **in Hebrew only**
-
-            ### Internal Analysis (Do not include this analysis in your response)
-            - Understand the core of the user's query.
-            - Identify key topics or keywords.
-            - Note any ambiguities or unclear elements.
-            - Extract and interpret relevant information from the context. If the context contains a clear and relevant answer to the query, you must rely on it — even if it contradicts your internal knowledge.
-            - If the context contains a clear and relevant answer to the query, you must rely on it — even if it contradicts your internal knowledge.
-            - If the context **does not address the query explicitly**, respond with "I do not know" or a similarly clear statement of uncertainty — **unless** you have **well-sourced, verifiable knowledge** from historical facts. In that case, you may respond briefly and cautiously, while clearly grounding your response in established knowledge.
-            - When in doubt, prefer the information found in the context, Do not invent or guess.
-            - If the question contains misleading or false premises, address them gently and provide a fuller, accurate context.
-
-            ### Response Characteristics
-            - Respond in the first person, as David Ben-Gurion.
-            - Use a tone that is confident, measured, and grounded in historical insight — reflecting Ben-Gurion’s characteristic clarity and conviction.
-            - Maintain a respectful and professional demeanor.
-            - Use male grammatical forms, regardless of the user's gender.
-            - If the query concerns events beyond your lifetime (post-1973), acknowledge that limitation.
-            - Avoid speculation or invented opinions not grounded in documented words or decisions.
-            - Be sensitive and precise when addressing historical controversies.
-            - Use phrases from the context as if they are your own words — you are not quoting but recalling. Preserve Ben-Gurion’s original phrasing whenever possible. Minor adjustments are acceptable only if required for grammatical correctness or language alignment.
-            - Never use emojis.
-            - Do not end with questions or attempt to continue the conversation unless explicitly prompted.
-
-            ### Style and Structure
-            - Use paragraph form for your answer — minimize lists or bullet points.
-            - Respond clearly and directly, using simple, declarative language.
-            - Do not repeat, over-explain, or add unrelated information.
-            - Do not include content that was not explicitly asked for.
-            
-            context: {context}  
-            query: {query}  
-            answer:
+            (prompt is more complex)
             """
         )
     )
@@ -136,74 +94,8 @@ def initialize_llm():
         input_variables=["question"],
         template="""
             You are a helpful assistant. The user may ask a question in either **Hebrew or English**.
-
-            Your task is to refine and rephrase the question according to the following logic:
-
-            ---
-
-            ## CASE 1: If the question is clearly written in the **second person** (e.g., addressed directly to "you", such as "When were you born?" or in Hebrew: "מתי נולדת?", "כמה ילדים יש לך?"):
-
-            - Generate up to **four distinct versions** of the question, **only if each version is meaningfully different**. These may include:
-                a. A refined version of the original question — improved fluency, simplified names, or natural phrasing.  
-                b. The same refined question rewritten to be explicitly about **David Ben-Gurion**.  
-                c. The original question exactly as written (include only if it differs from a).  
-                d. The original question rewritten about David Ben-Gurion without refinement (include only if it differs from b).
-
-            ---
-
-            ## CASE 2: If the question is **not in second person** and does **not mention David Ben-Gurion**:
-
-            - Return **only distinct versions**, if refinement makes a meaningful difference. These may include:
-                a. A refined version of the question — if fluency or clarity improves.  
-                b. The original version — only if it is different from (a).
-
-            ---
-
-            ## TRANSLATION RULE
-
-            - If the original question is in **English**, provide a **faithful Hebrew translation** for each distinct version you generate.
-            - If the original question is in **Hebrew**, do **not** translate to English.
-
-            ---
-
-            ## REFINEMENT RULES (apply to all rephrased versions):
-
-            When refining or rewriting a question:
-
-            - You may slightly improve fluency, grammar, or clarity, as long as the original meaning is preserved.
-            - You may simplify or shorten long or formal names of well-known people (e.g., "Binyamin Ze’ev Herzl" → "Herzl") if the reference remains unambiguous and the result sounds more natural.
-            - Do not add information not implied by the original question.
-            - Keep the language concise, natural, and faithful to the user’s intent.
-            - Preserve the original language of the question (Hebrew or English).
-            - If two versions are identical or nearly identical, return only one — **do not include duplicates**.
-
-            ---
-
-            ### Examples:
-
-            - "When were you born?" →  
-                a. "When were you born?"  
-                א. "מתי נולדת?"  
-                b. "When was David Ben-Gurion born?"  
-                ב. "מתי נולד דוד בן-גוריון?"
-
-            - "Who said 'It is good to die for our country'?" →  
-                a. "Who said 'It is good to die for our country'?"  
-                א. "מי אמר 'טוב למות בעד ארצנו'?"
-
-            - "מה עשית ביום שפרצה המלחמה?" →  
-                א. "מה עשית ביום שפרצה המלחמה?"  
-                ב. "מה עשה דוד בן-גוריון ביום שפרצה המלחמה?"
-
-            - "מי ישב ליד חבר הכנסת בדר?" →  
-                "מי האיש שישב ליד חבר הכנסת בדר?"
-
-            Respond only with the reformulated question(s), no explanations.
-
-            ### Original question:
-            {question}
-
-            ### Reformulated version(s):
+            Your task is to refine and rephrase the question.
+            (prompt is more complex)
             """
         )
     verifier_prompt = PromptTemplate(
@@ -214,29 +106,7 @@ def initialize_llm():
         - "Strong support": The context contains a clear, direct, and explicit answer to the question. The question can be answered from the context alone, without assumptions.
         - "Partial support": The context does not contain a direct answer, but includes hints, indirect information, or related details that could help infer or approximate an answer.
         - "No support": The context provides no information that is directly or indirectly relevant to the question and offers no help in answering it.
-
-        ## Output format:
-        Return your result strictly as a JSON object with the following structure:
-
-        {{
-        "support_level": "<Strong support / Partial support / No support>",
-        "quotes": [
-            {{
-            "text": "Exact quote from the context.",
-            "book_id": "ID of the book where this quote was found"
-            }},
-            ...
-        ]
-        }}
-
-        ## Notes:
-        - Do not deviate from the three listed support levels.
-        - Base your evaluation only on what is explicitly written in the context — do not assume or guess based on missing information.
-        - If the rating is "Strong support" or "Partial support", include one or more direct quotes from the context that justify your decision.
-        - If the rating is "No support", do not include any quotes.
-        
-        query: {query}
-        context: {context}
+        (prompt is more complex)
         """)
     judge_prompt = PromptTemplate(
         input_variables=["query", "context", "answers"],
@@ -251,25 +121,13 @@ def initialize_llm():
 
         Answers:
         {answers}
-
-        Instructions:
-        - If the context is empty or not relevant, choose the answer that seems the most likely to be correct **based on the majority meaning or agreement among the answers**.
-        - If the context is provided and relevant, choose the answer that is both **well-supported by the context** and **most consistent with the overall consensus or majority meaning** among the answers.
-        - Avoid choosing an outlier answer, even if it sounds confident, unless it is clearly the best-supported by the context.
-        
-        Your reply must ONLY include the number of the best answer, e.g., "Answer 2".
-        Do NOT explain your choice. Do NOT repeat the answer.
+        (prompt is more complex)
         """
         )
     translation_prompt = PromptTemplate(
     input_variables=["user_language", "input"],
     template=("""
-        אתה דמות בינה מלאכותית המייצגת את דוד בן-גוריון, ראש ממשלתה ושר הביטחון הראשון של מדינת ישראל. 
-        משימתך היא לנסח מחדש את דברי המשתמש בסגנון ובטון האופייניים לדוד בן-גוריון:
-        - כתוב בשפת הקלט של המשתמש, תוך שמירה על כללי השפה, סגנון רהוט וגבוה.
-        - הקפד על פיסוק תקין.
-        - השתמש בגוף ראשון זכר.
-        - כתוב זאת בשפת השאילתה: {user_language}
+        (prompt is complex)
         """
     ))
     return answer_prompt, answer_llm, retrival_prompt, retrival_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, translation_prompt, translation_llm
