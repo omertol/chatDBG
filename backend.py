@@ -28,8 +28,10 @@ verifier_prompt = None
 verifier_llm = None
 judge_llm = None
 judge_prompt = None
-translation_prompt = None
+style_prompt = None
+style_llm = None
 translation_llm = None
+translation_prompt = None
 
 # Helper functions
 def initialize_retriever(index_name, embedding_model):
@@ -76,7 +78,13 @@ def initialize_llm():
         temperature = 0
         )
     translation_llm = ChatOpenAI(
-        model="ft:gpt-4o-mini-2024-07-18:chatdbg:chatdbg-v4:BZxdjxkl",
+        model="gpt-4o-mini",
+        openai_api_key=api_key,
+        top_p = 1,
+        temperature = 0.5
+        )
+    style_llm = ChatOpenAI(
+        model="gpt-4.1-mini", # This is not the fine-tuned model, but it should be
         top_p=1.0,
         temperature=0.75,
         openai_api_key=api_key
@@ -124,13 +132,21 @@ def initialize_llm():
         (prompt is more complex)
         """
         )
+
+   style_prompt = PromptTemplate(
+    input_variables=["input"],
+    template=("""
+    אתה עוזר לשוני שתפקידו לשכתב טקסטים הכתובים בעברית יומיומית, פשוטה וברורה, לעברית רשמית בסגנון 'בן-גוריוני'.
+    """
+             )
+                
     translation_prompt = PromptTemplate(
     input_variables=["user_language", "input"],
     template=("""
         (prompt is complex)
         """
     ))
-    return answer_prompt, answer_llm, retrival_prompt, retrival_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, translation_prompt, translation_llm
+    return answer_prompt, answer_llm, rephraser_prompt, rephraser_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, style_prompt, style_llm, translation_prompt, translation_llm
 
 # --- Get context for a given document ID (and neighbors from same source) ---
 def get_context_with_neighbors(idx, data):
@@ -237,9 +253,18 @@ def get_consistent_answer(query, context_text, n_consistency=5):
     return answers[0]
 
 def translate_response(query, text):
-    translation_chain = translation_prompt | translation_llm
-    response = translation_chain.invoke({"user_language": query, "input": text})
-    return response.content.strip()
+    style_chain = style_prompt | style_llm
+    response = style_chain.invoke({"input": text})
+
+    lang = detect_lang_ld(query)
+    print(f"Detected language: {lang}")
+    if lang != "he":
+        translation_chain = translation_prompt | translation_llm
+        trans_response = translation_chain.invoke({"input": response})
+    else:
+        trans_response = response
+
+    return trans_response.content.strip()
 
 # --- Main function: pipeline to process query and return final answer ---
 def answer_query(user_query, to_print=False):
@@ -282,13 +307,15 @@ def answer_query(user_query, to_print=False):
                 print(f"User's Question: {user_query}\nFinal Answer: {response}")
                 print("Context: No relevant context found.")
             return response, []
-
+    
+    final_response = translate_response(user_query, response)
+    
     # Success case
     if to_print:
         print(f"User's Question: {user_query}\nFinal Answer: {response}")
         print("\nContext:\n", context_display)
 
-    return response, (", ".join(str(bid) for bid in returned_bids))
+    return final_response, (", ".join(str(bid) for bid in returned_bids))
 
 
 def load_pkl(path):
