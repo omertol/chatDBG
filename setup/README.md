@@ -53,11 +53,9 @@ You can create a list of page names within the notebook, then loop over the list
 
 ## 🧪 Style Transfer (Optional)
 
-1. Generate parallel text: `text_generation.ipynb`
-2. Fine-tune model: `fine_tune.ipynb`
+To fine-tune an OpenAI model successfully, you should create a dataset consisting of pairs of modern Hebrew texts and their corresponding Ben-Gurion-style transcripts, then run the `fine-tune.ipynb` notebook.
 
-The `fine_tune.ipynb` notebook includes an input validation step based on [OpenAI's Fine-Tuning Guide](https://platform.openai.com/docs/guides/fine-tuning).
-
+Note: This notebook includes an input validation step based on [OpenAI's Fine-Tuning Guide](https://platform.openai.com/docs/guides/fine-tuning).
 ---
 
 ## 📝 Notes
