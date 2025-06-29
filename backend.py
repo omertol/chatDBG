@@ -22,8 +22,8 @@ retriever = None
 answer_prompt = None
 answer_llm = None
 vectorstore = None
-retrival_llm = None
-retrival_prompt = None
+rephraser_llm = None
+rephraser_prompt = None
 verifier_prompt = None
 verifier_llm = None
 judge_llm = None
@@ -60,7 +60,7 @@ def initialize_llm():
         top_p = 1,
         temperature = 0.7
         )
-    retrival_llm = ChatOpenAI(model="gpt-4.1",
+    rephraser_llm = ChatOpenAI(model="gpt-4.1",
         openai_api_key=api_key,
         top_p = 1,
         temperature = 0.5
@@ -98,7 +98,7 @@ def initialize_llm():
             """
         )
     )
-    retrival_prompt = PromptTemplate(
+    rephraser_prompt = PromptTemplate(
         input_variables=["question"],
         template="""
             You are a helpful assistant. The user may ask a question in either **Hebrew or English**.
@@ -165,7 +165,7 @@ def get_context_with_neighbors(idx, data):
 
 # --- Generate variants of the query ---
 def generate_queries(original_query):
-    chain = retrival_prompt | retrival_llm
+    chain = rephraser_prompt | rephraser_llm
     output = chain.invoke({"question": original_query})
     text_output = output.content
 
@@ -324,10 +324,10 @@ def load_pkl(path):
 
 
 def initialize_components():
-    global data, retriever, vectorstore, answer_prompt, answer_llm, retrival_prompt, retrival_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, translation_prompt, translation_llm
+    global data, retriever, vectorstore, answer_prompt, answer_llm, rephraser_prompt, rephraser_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, translation_prompt, translation_llm, style_prompt, style_llm
     data = load_pkl('combined_chunks.pkl')
     embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
-    answer_prompt, answer_llm, retrival_prompt, retrival_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, translation_prompt, translation_llm = initialize_llm()
+    answer_prompt, answer_llm, rephraser_prompt, rephraser_llm, verifier_prompt, verifier_llm, judge_prompt, judge_llm, style_prompt, style_llm, translation_prompt, translation_llm = initialize_llm()
     retriever = initialize_retriever("faiss_index_openai_3textlarge_copy", embedding_model)
     print("Done initialize")
 
