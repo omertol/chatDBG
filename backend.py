@@ -1,20 +1,27 @@
 import os
 import torch
 import pandas as pd
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings
-from langchain.retrievers import BM25Retriever, EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
 from concurrent.futures import ThreadPoolExecutor
 import time
 import re
 from openai import RateLimitError
+import json
+from langdetect import detect, DetectorFactory
+import datetime
 
 # Constants
 DATA_PATH = './data/'
+LOG_PATH = './logs/query_log.jsonl'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 api_key = "YOUR-API-KEY"
+os.environ["OPENAI_API_KEY"] = api_key
+DetectorFactory.seed = 0
 
 # Global variables
 data = None
@@ -34,6 +41,18 @@ translation_llm = None
 translation_prompt = None
 
 # Helper functions
+def log_interaction(entry: dict):
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    with open(LOG_PATH, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
+
+def detect_lang_ld(text):
+    try:
+        return detect(text)
+    except:
+        return "unknown"
+        
 def initialize_retriever(index_name, embedding_model):
     vectorstore = FAISS.load_local(
         folder_path=index_name,
@@ -268,23 +287,40 @@ def translate_response(query, text):
 
 # --- Main function: pipeline to process query and return final answer ---
 def answer_query(user_query, to_print=False):
+    log_entry = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "original_query": user_query,
+        "query_language": detect_lang_ld(user_query),
+        "rephrased_queries": [],
+        "used_query": user_query,
+        "support_level": None,
+        "book_ids": [],
+        "pre_translated_answer": None,
+        "final_answer": None
+    }
     # First try the original query
     context_text, retrieved_bids = retrieve_contexts(user_query)
     support_level, quotes, book_ids = is_supported_by_context(user_query, context_text)
+
+    log_entry["support_level"] = support_level
 
     if support_level == "Strong support":
         response = get_consistent_answer(user_query, quotes)
         context_display = "\n".join(quotes)
         returned_bids = book_ids
+        log_entry["book_ids"] = book_ids
 
     elif support_level == "Partial support":
         response = get_consistent_answer(user_query, context_text)
         context_display = context_text
         returned_bids = retrieved_bids
+        log_entry["book_ids"] = retrieved_bids
 
     else:
         # No support – try query variants
         queries = generate_queries(user_query)
+        log_entry["rephrased_queries"] = queries
+
         for q in queries:
             context_text, retrieved_bids = retrieve_contexts(q)
             support_level, quotes, book_ids = is_supported_by_context(user_query, context_text)
@@ -293,27 +329,38 @@ def answer_query(user_query, to_print=False):
                 response = get_consistent_answer(user_query, quotes)
                 context_display = "\n".join(quotes)
                 returned_bids = book_ids
+                log_entry.update({
+                    "support_level": support_level,
+                    "used_query": q,
+                    "book_ids": book_ids
+                })
                 break
 
             elif support_level == "Partial support":
                 response = get_consistent_answer(user_query, context_text)
                 context_display = context_text
                 returned_bids = retrieved_bids
+                log_entry.update({
+                    "support_level": support_level,
+                    "used_query": q,
+                    "book_ids": retrieved_bids
+                })
                 break
         else:
             # No support found at all
             response = get_consistent_answer(user_query, "")
-            if to_print:
-                print(f"User's Question: {user_query}\nFinal Answer: {response}")
-                print("Context: No relevant context found.")
-            return response, []
-    
+            returned_bids = []
+
+    log_entry["pre_translated_answer"] = response
     final_response = translate_response(user_query, response)
-    
+    log_entry["final_answer"] = final_response
+
     # Success case
     if to_print:
-        print(f"User's Question: {user_query}\nFinal Answer: {response}")
+        print(f"User's Question: {user_query}\nFinal Answer: {final_response}")
         print("\nContext:\n", context_display)
+        
+    log_interaction(log_entry)
 
     return final_response, (", ".join(str(bid) for bid in returned_bids))
 
