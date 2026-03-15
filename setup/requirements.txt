@@ -46,7 +46,7 @@ jupyterlab==4.3.4
 kubernetes==32.0.0
 langchain==0.3.15
 langchain-community==0.3.15
-langchain-core==0.3.31
+langchain-core==0.3.81
 langchain-mistralai==0.2.4
 langsmith==0.3.1
 markdown-it-py==3.0.0
