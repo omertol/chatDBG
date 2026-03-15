@@ -68,7 +68,7 @@ peft==0.14.0
 pillow==10.2.0
 posthog==3.11.0
 preshed==3.0.9
-protobuf==5.29.3
+protobuf==5.29.6
 psutil==6.1.1
 pydantic==2.10.5
 pydantic-settings==2.7.1
